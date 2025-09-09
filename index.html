@@ -238,20 +238,24 @@
       document.getElementById("countdown-text").textContent = `Tid kvar till nästa arbetsdygn ${hoursLeft}:${minutesLeft}:${secondsLeft}`;
     }
 
-    async function scheduleLetterUpdate() {
-      const now = await getSwedishTime();
-      const next = getNextWorkdayStart(now);
-      const msUntilNext = Math.max(next - now, 0);
-      setTimeout(async () => {
-        await displayLetter(true);
-        scheduleLetterUpdate();
-      }, msUntilNext);
-    }
+function scheduleLetterUpdate() {
+  getSwedishTime().then(async now => {
+    const next = getNextWorkdayStart(now);
+    const msUntilNext = Math.max(next - now, 0); // säkerställ att ms >= 0
 
-    setInterval(() => displayLetter(false), 60000);
-    displayLetter(true);
-    scheduleLetterUpdate();
-    setInterval(updateClockAndCountdown, 1000);
+    setTimeout(async () => {
+      await displayLetter(true); // visa ny bokstav och datum/veckodag
+      scheduleLetterUpdate();    // schemalägg nästa uppdatering
+    }, msUntilNext);
+  });
+}
+
+// Starta uppdateringarna
+setInterval(() => displayLetter(false), 60000); // uppdatera bokstav/minutvisning varje minut
+displayLetter(true);                             // visa initial bokstav
+scheduleLetterUpdate();                          // schemalägg nästa arbetsdygn
+setInterval(updateClockAndCountdown, 1000);     // uppdatera klocka och nedräkning varje sekund
+
 
   </script>
 </body>
