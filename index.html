@@ -106,34 +106,31 @@ function getXYReferenceDate() {
     const now = new Date(new Date().toLocaleString("sv-SE", { timeZone: "Europe/Stockholm" }));
     let xyDate = new Date(now);
     xyDate.setHours(0,0,0,0);
-
     if (now.getHours() < 5 || (now.getHours() === 5 && now.getMinutes() < 30)) {
         xyDate.setDate(xyDate.getDate() - 1);
     }
-
     while (!isValidWorkday(xyDate)) {
         xyDate.setDate(xyDate.getDate() - 1);
     }
-
     return xyDate;
 }
 
-// Beräkna X/Y
+// Beräkna X/Y med korrekt start = X
 function computeLetter() {
     const xyDate = getXYReferenceDate();
     let count = 0;
     const cur = new Date(startDate);
     cur.setHours(0,0,0,0);
-    while (cur <= xyDate) {
-        if (isValidWorkday(cur)) count++;
+    while (cur < xyDate) {
         cur.setDate(cur.getDate() + 1);
+        if (isValidWorkday(cur)) count++;
     }
-    return (count % 2 === 0) ? "X" : "Y";
+    return ((count % 2) === 1) ? "X" : "Y";
 }
 
 // Visa bokstav, datum och veckodag
 function displayLetter(doFlip = true) {
-    const displayDate = new Date(new Date().toLocaleString("sv-SE", { timeZone: "Europe/Stockholm" }));
+    const refDate = getXYReferenceDate(); // <-- Korrekt datum för veckodag
     const letter = computeLetter();
     const letterEl = document.getElementById("letter");
 
@@ -157,8 +154,10 @@ function displayLetter(doFlip = true) {
     }
 
     currentLetter = letter;
-    document.getElementById("date").textContent = displayDate.toLocaleDateString('sv-SE', {year:'numeric', month:'2-digit', day:'2-digit'}).replace(/\./g,'-');
-    document.getElementById("weekday").textContent = capitalize(displayDate.toLocaleDateString('sv-SE', { weekday: 'long' }));
+    document.getElementById("date").textContent =
+        refDate.toLocaleDateString('sv-SE', {year:'numeric', month:'2-digit', day:'2-digit'}).replace(/\./g,'-');
+    document.getElementById("weekday").textContent =
+        capitalize(refDate.toLocaleDateString('sv-SE', { weekday: 'long' }));
 }
 
 // Nästa arbetsdag start 05:30
