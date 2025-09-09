@@ -57,14 +57,12 @@
   <div class="next-workday-text" id="next-workday-text">Nästa arbetsdygn...</div>
   <div class="countdown-text" id="countdown-text">Tid kvar...</div>
 
-  <script>
-    const startDate = new Date("2025-01-02");
-    let holidays = [];
-    const TIME_SYNC_INTERVAL = 5 * 60 * 1000;
+<script>
+  // Startdatum för X/Y
+  const startDate = new Date("2025-01-02"); // Bör vara arbetsdag
+  let currentLetter = null;
 
-    let currentTime = null;
-    let lastSync = 0;
-
+  // Lokala helgdagar
     const localHolidays = [
       "2025-01-01","2025-01-06","2025-04-18","2025-04-20","2025-04-21","2025-05-01","2025-05-29","2025-06-06",
       "2025-06-20","2025-06-21","2025-11-01","2025-12-24","2025-12-25","2025-12-26","2025-12-31",
@@ -78,162 +76,152 @@
       "2029-06-22","2029-06-23","2029-11-03","2029-12-24","2029-12-25","2029-12-26","2029-12-31"
     ];
 
-    async function fetchHolidays(year) {
-      try {
-        const res = await fetch(`https://api.dagsmart.se/holidays?year=${year}&weekends=false`);
-        if (!res.ok) throw new Error("Fel vid hämtning av helgdagar från API");
-        const data = await res.json();
-        return data.map(h => h.date);
-      } catch (err) {
-        console.warn("API saknas, fallback till lokal lista:", err);
-        return localHolidays.filter(d => d.startsWith(String(year)));
-      }
-    }
+  const TIME_SYNC_INTERVAL = 5 * 60 * 1000;
+  let currentTime = null;
+  let lastSync = 0;
 
-    async function getSwedishTime() {
-      const API_KEY = "40O5JW280XZE";
-      const url = `https://api.timezonedb.com/v2.1/get-time-zone?key=${API_KEY}&format=json&by=zone&zone=Europe/Stockholm`;
-      try {
-        const res = await fetch(url);
-        if (!res.ok) throw new Error(`HTTP fel: ${res.status}`);
-        const data = await res.json();
-        return new Date(data.formatted);
-      } catch (err) {
-        console.warn("Fallback till lokal tid:", err);
-        return new Date();
-      }
-    }
+  // Kontrollera om datum är arbetsdag
+  function isValidWorkday(date) {
+    const day = date.getDay(); // 0 = söndag, 6 = lördag
+    const str = date.toISOString().split("T")[0];
+    if (day === 0 || day === 6) return false;
+    if (localHolidays.includes(str)) return false;
+    if (date.getMonth() === 11 && (date.getDate() === 24 || date.getDate() === 31)) return false;
+    return true;
+  }
 
-    async function loadHolidays() {
-      const thisYear = new Date().getFullYear();
-      const nextYear = thisYear + 1;
-      const [h1, h2] = await Promise.all([fetchHolidays(thisYear), fetchHolidays(nextYear)]);
-      holidays = [...h1, ...h2];
-    }
+  // Referensdatum = senaste arbetsdag (inklusive idag om arbetsdag)
+function getReferenceDate() {
+    const now = new Date();
+    const swedenDate = new Date(now.toLocaleString("sv-SE", { timeZone: "Europe/Stockholm" }));
+    swedenDate.setHours(0,0,0,0);
 
-    function isValidWorkday(date) {
-      const day = date.getDay();
-      const str = date.toISOString().split("T")[0];
-      if (day === 0 || day === 6) return false;
-      if (holidays.includes(str)) return false;
-      if (date.getMonth() === 11 && (date.getDate() === 24 || date.getDate() === 31)) return false;
-      return true;
+    let refDate = new Date(swedenDate);
+    while (!isValidWorkday(refDate)) {
+        refDate.setDate(refDate.getDate() - 1);
     }
+    return refDate;
+}
 
-    function countWorkdays(from, to) {
-      let count = 0;
-      const cur = new Date(from);
-      while (cur <= to) {
+// Exkludera startdatum i count
+function computeLetter() {
+    const refDate = getReferenceDate();
+    let count = 0;
+    const cur = new Date(startDate);
+    cur.setHours(0,0,0,0);
+
+    while (cur <= refDate) {
         if (isValidWorkday(cur)) count++;
         cur.setDate(cur.getDate() + 1);
-      }
-      return count;
     }
 
-    function capitalize(str) {
-      return str.charAt(0).toUpperCase() + str.slice(1);
-    }
+    // Eftersom startdatum är X, X = 1:a arbetsdagen → modulo 2 justeras:
+    return (count % 2 === 1) ? "X" : "Y";
+}
 
-    let currentLetter = null;
+  // Första bokstaven stor
+  function capitalize(str) {
+    return str.charAt(0).toUpperCase() + str.slice(1);
+  }
 
-    async function displayLetter(doFlip = true) {
-      let now = await getSwedishTime();
-      let workdayCheck = new Date(now);
-      if (workdayCheck.getHours() < 5 || (workdayCheck.getHours() === 5 && workdayCheck.getMinutes() < 30)) {
-        workdayCheck.setDate(workdayCheck.getDate() - 1);
-      }
-
-      if (holidays.length === 0) await loadHolidays();
-
-      let refDate = new Date(workdayCheck);
-      refDate.setHours(0,0,0,0);
-      while (!isValidWorkday(refDate) && refDate >= startDate) {
-        refDate.setDate(refDate.getDate() - 1);
-      }
-
-      const count = countWorkdays(startDate, refDate);
-      const letter = (count % 2 === 0) ? "X" : "Y";
-
-      const letterEl = document.getElementById("letter");
-      document.body.style.background = (letter === "X") 
+  // Visa bokstav och datum
+  function displayLetter(doFlip = true) {
+    const letter = computeLetter();
+    const letterEl = document.getElementById("letter");
+    document.body.style.background = (letter === "X")
         ? "linear-gradient(135deg, #0BA2F4, #004080)"
         : "linear-gradient(135deg, #27F584, #008040)";
 
-      if (doFlip || letter !== currentLetter) {
-        letterEl.style.transform = "rotateY(90deg)";
-        letterEl.style.opacity = 0;
-        setTimeout(() => {
-          letterEl.textContent = letter;
-          letterEl.style.transform = "rotateY(0deg)";
-          letterEl.style.opacity = 1;
-          letterEl.style.visibility = "visible";
-          document.querySelectorAll(".date, .weekday, .next-workday-text, .clock-text, .countdown-text")
-            .forEach(el => el.style.visibility = "visible");
-        }, 600);
-      } else {
+    if (doFlip || letter !== currentLetter) {
+      letterEl.style.transform = "rotateY(90deg)";
+      letterEl.style.opacity = 0;
+      setTimeout(() => {
         letterEl.textContent = letter;
-      }
-
-      currentLetter = letter;
-
-      const yyyyRef = refDate.getFullYear();
-      const mmRef = String(refDate.getMonth() + 1).padStart(2, "0");
-      const ddRef = String(refDate.getDate()).padStart(2, "0");
-      document.getElementById("date").textContent = `${yyyyRef}-${mmRef}-${ddRef}`;
-      document.getElementById("weekday").textContent = capitalize(refDate.toLocaleDateString('sv-SE', { weekday: 'long' }));
+        letterEl.style.transform = "rotateY(0deg)";
+        letterEl.style.opacity = 1;
+        letterEl.style.visibility = "visible";
+        document.querySelectorAll(".date, .weekday, .next-workday-text, .clock-text, .countdown-text")
+          .forEach(el => el.style.visibility = "visible");
+      }, 600);
+    } else {
+      letterEl.textContent = letter;
     }
 
-    function getNextWorkdayStart(now) {
-      let next = new Date(now);
+    currentLetter = letter;
+
+    const refDate = getReferenceDate();
+    document.getElementById("date").textContent = refDate.toISOString().split("T")[0];
+    document.getElementById("weekday").textContent = capitalize(refDate.toLocaleDateString('sv-SE', { weekday: 'long' }));
+  }
+
+  // Nästa arbetsdag kl 05:30
+  function getNextWorkdayStart(now) {
+    let next = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 5, 30, 0, 0);
+    if (now >= next) next.setDate(next.getDate() + 1);
+    while (!isValidWorkday(next)) {
+      next.setDate(next.getDate() + 1);
       next.setHours(5,30,0,0);
-      if (now >= next) next.setDate(next.getDate() + 1);
-      while (!isValidWorkday(next)) {
-        next.setDate(next.getDate() + 1);
-        next.setHours(5,30,0,0);
-      }
-      return next;
     }
+    return next;
+  }
 
-    async function updateClockAndCountdown() {
-      const nowMs = Date.now();
-      if (!currentTime || nowMs - lastSync > TIME_SYNC_INTERVAL) {
-        currentTime = await getSwedishTime();
-        lastSync = nowMs;
-      } else {
-        currentTime = new Date(currentTime.getTime() + 1000);
-      }
-      let now = currentTime;
-      let nextWorkday = getNextWorkdayStart(now);
-
-      const yyyy = nextWorkday.getFullYear();
-      const mm = String(nextWorkday.getMonth() + 1).padStart(2,"0");
-      const dd = String(nextWorkday.getDate()).padStart(2,"0");
-      const weekday = nextWorkday.toLocaleDateString("sv-SE", { weekday: "long" });
-
-      document.getElementById("next-workday-text").textContent = `Nästa arbetsdygn börjar ${weekday} ${yyyy}-${mm}-${dd} 05:30`;
-
-      document.getElementById("clock-text").textContent = `Klockan är nu ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')}`;
-
-      const diff = nextWorkday - now;
-      document.getElementById("countdown-text").textContent = `Tid kvar till nästa arbetsdygn ${String(Math.floor(diff / (1000*60*60)).toString().padStart(2,'0'))}:${String(Math.floor((diff/1000/60)%60).toString().padStart(2,'0'))}:${String(Math.floor((diff/1000)%60).toString().padStart(2,'0'))}`;
+  // Hämta svensk tid (API fallback till lokal tid)
+  async function getSwedishTime() {
+    const API_KEY = "40O5JW280XZE"; // endast för klocka
+    const url = `https://api.timezonedb.com/v2.1/get-time-zone?key=${API_KEY}&format=json&by=zone&zone=Europe/Stockholm`;
+    try {
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(`HTTP fel: ${res.status}`);
+      const data = await res.json();
+      return new Date(data.formatted);
+    } catch (err) {
+      return new Date();
     }
+  }
 
-    async function scheduleLetterUpdate() {
-      const now = await getSwedishTime();
-      const next = getNextWorkdayStart(now);
-      const msUntilNext = Math.max(next - now, 0);
-
-      setTimeout(async () => {
-        await displayLetter(true);
-        scheduleLetterUpdate();
-      }, msUntilNext);
+  // Uppdatera klocka och nedräkning
+  async function updateClockAndCountdown() {
+    const nowMs = Date.now();
+    if (!currentTime || nowMs - lastSync > TIME_SYNC_INTERVAL) {
+      currentTime = await getSwedishTime();
+      lastSync = nowMs;
+    } else {
+      currentTime = new Date(currentTime.getTime() + 1000);
     }
+    const now = currentTime;
+    const nextWorkday = getNextWorkdayStart(now);
 
-    // Starta uppdateringarna
-    setInterval(() => displayLetter(false), 60000);
-    displayLetter(true);
-    scheduleLetterUpdate();
-    setInterval(updateClockAndCountdown, 1000);
-  </script>
+    const yyyy = nextWorkday.getFullYear();
+    const mm = String(nextWorkday.getMonth()+1).padStart(2,'0');
+    const dd = String(nextWorkday.getDate()).padStart(2,'0');
+    const weekday = nextWorkday.toLocaleDateString("sv-SE", { weekday: "long" });
+
+    document.getElementById("next-workday-text").textContent =
+      `Nästa arbetsdygn börjar ${weekday} ${yyyy}-${mm}-${dd} 05:30`;
+    document.getElementById("clock-text").textContent =
+      `Klockan är nu ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')}`;
+
+    const diff = nextWorkday - now;
+    document.getElementById("countdown-text").textContent =
+      `Tid kvar till nästa arbetsdygn ${String(Math.floor(diff / (1000*60*60)).toString().padStart(2,'0'))}:${String(Math.floor((diff/1000/60)%60).toString().padStart(2,'0'))}:${String(Math.floor((diff/1000)%60).toString().padStart(2,'0'))}`;
+  }
+
+  // Schemalägg uppdatering vid nästa arbetsdag
+  async function scheduleLetterUpdate() {
+    const now = new Date();
+    const next = getNextWorkdayStart(now);
+    const msUntilNext = Math.max(next - now, 0);
+    setTimeout(() => {
+      displayLetter(true);
+      scheduleLetterUpdate();
+    }, msUntilNext);
+  }
+
+  // Starta allt
+  displayLetter(true);
+  scheduleLetterUpdate();
+  setInterval(displayLetter, 60000); // säkerhetsuppdatering varje minut
+  setInterval(updateClockAndCountdown, 1000);
+</script>
 </body>
 </html>
