@@ -216,13 +216,13 @@ document.getElementById("weekday").textContent = capitalize(refDate.toLocaleDate
 
     }
 
-    function getNextWorkdayStart(now) {
-      let next = new Date(now);
-      next.setHours(5,45,0,0);
-      if (now >= next) next.setDate(next.getDate() + 1);
-      while (!isValidWorkday(next)) next.setDate(next.getDate() + 1);
-      return next;
-    }
+function getNextWorkdayStart(now) {
+  let next = new Date(now);
+  next.setHours(5,30,0,0);
+  if (now >= next) next.setDate(next.getDate() + 1);
+  while (!isValidWorkday(next)) next.setDate(next.getDate() + 1);
+  return next;
+}
 
     // --- ÄNDRAD DEL START ---
     let currentTime = null;
@@ -251,7 +251,7 @@ document.getElementById("weekday").textContent = capitalize(refDate.toLocaleDate
       const mm = String(nextWorkday.getMonth() + 1).padStart(2,"0");
       const dd = String(nextWorkday.getDate()).padStart(2,"0");
       const weekday = nextWorkday.toLocaleDateString("sv-SE", { weekday: "long" });
-      document.getElementById("next-workday-text").textContent = `Nästa arbetsdygn börjar ${weekday} ${yyyy}-${mm}-${dd} 05:45`;
+      document.getElementById("next-workday-text").textContent = `Nästa arbetsdygn börjar ${weekday} ${yyyy}-${mm}-${dd} 05:30`;
 
       const nowHours = String(now.getHours()).padStart(2,'0');
       const nowMinutes = String(now.getMinutes()).padStart(2,'0');
