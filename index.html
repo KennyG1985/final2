@@ -240,7 +240,7 @@ document.getElementById("weekday").textContent = capitalize(refDate.toLocaleDate
       let now = currentTime;
 
       let nextWorkday = new Date(now);
-      nextWorkday.setHours(5,45,0,0);
+      nextWorkday.setHours(5,30,0,0);
       if (now >= nextWorkday) nextWorkday.setDate(nextWorkday.getDate() + 1);
       while (!isValidWorkday(nextWorkday)) {
         nextWorkday.setDate(nextWorkday.getDate() + 1);
